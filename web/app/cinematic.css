@@ -1,0 +1,1107 @@
+/* ══════════════════════════════════════════════════════════════
+   EARNORA — cinematic authentication experience
+   Bright blue & white environment. Structure:
+
+     .cine                fixed full-screen root, phase driven (data-phase)
+       .cine__bg          gradient sky, light rays, floating orbs
+       .cine__cam         camera translate (follows the case out)
+         .cine__stage     perspective + floor plane
+           .cine__streak  contrail the case leaves on its way out
+           .case--floor   the one main animated element — the case
+           .cine__burst   light burst from the case
+           .cine__beam    beam climbing from the case to the form
+           .cine__panel   the glass form panel (rises from the case)
+       .intro             EARNORA light-stroke intro overlay
+
+   Phases: intro → enter → place → cross → open → auth
+           → snap → launch → flood → (navigate)
+
+   Layout rule: `--panel-bottom` is the source of truth and `--case-bottom`
+   is derived from it, so the top of the case always sits exactly
+   `--case-gap` px under the form — the panel can never cover it.
+   ══════════════════════════════════════════════════════════════ */
+
+.cine {
+  --case-x: 48%;
+  --cam-x: 0%;
+  --case-w: clamp(128px, min(18vw, 26vh), 232px);
+  --case-h: calc(var(--case-w) * 0.6778); /* 122/180 of the case viewBox */
+  /* clear space between the top of the case and the form: room for the lid
+     to lift into and a shaft of light to climb through */
+  --case-gap: clamp(56px, 12vh, 104px);
+  --case-floor: 18px; /* the case never sits hard against the viewport edge */
+  /* where the form hovers. Never lower than the stack it has to clear —
+     case + gap + floor — so the case always lands with air under it. */
+  --panel-bottom: max(27vh, calc(var(--case-h) + var(--case-gap) + var(--case-floor)));
+  --case-bottom: calc(var(--panel-bottom) - var(--case-h) - var(--case-gap));
+  --sky-1: #f4f9ff;
+  --sky-2: #dbe9ff;
+  --sky-3: #c3dbff;
+  --ink: #12224d;
+  --font-h: var(--font-heading, 'Plus Jakarta Sans', system-ui, sans-serif);
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 46%, var(--sky-3) 100%);
+  color: var(--ink);
+  font-family: var(--font-body, 'Work Sans', system-ui, sans-serif);
+  z-index: 50;
+  -webkit-font-smoothing: antialiased;
+}
+
+.cine *,
+.cine *::before,
+.cine *::after { box-sizing: border-box; }
+
+.cine button { font-family: inherit; }
+
+/* ── phase-driven positioning (desktop) ───────────────────────── */
+/* parked on `--case-x` from the moment it lands until the exit starts;
+   only the way in and the way out ever move it */
+.cine[data-phase='intro'] .case--floor { left: -26%; opacity: 0; }
+
+.cine[data-phase='launch'] { --cam-x: 5%; --cam-scale: 1.05; }
+.cine[data-phase='flood'] { --cam-x: 7%; --cam-scale: 1.08; }
+
+/* ── backdrop ─────────────────────────────────────────────────── */
+.cine__bg { position: absolute; inset: 0; overflow: hidden; }
+
+.cine__rays {
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  width: 150vmax;
+  height: 150vmax;
+  transform: translateX(-50%);
+  background:
+    conic-gradient(from 200deg at 50% 0%,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 0.75) 14deg,
+      rgba(255, 255, 255, 0) 30deg,
+      rgba(56, 189, 248, 0.28) 46deg,
+      rgba(255, 255, 255, 0) 64deg,
+      rgba(255, 255, 255, 0.55) 84deg,
+      rgba(255, 255, 255, 0) 104deg);
+  opacity: 0.65;
+  animation: rayDrift 26s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes rayDrift {
+  from { transform: translateX(-50%) rotate(-7deg); }
+  to   { transform: translateX(-50%) rotate(7deg); }
+}
+
+.cine__orb {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #ffffff, rgba(147, 197, 253, 0.55) 55%, rgba(56, 189, 248, 0.18) 100%);
+  box-shadow: 0 18px 50px rgba(59, 130, 246, 0.2);
+  opacity: 0.75;
+  animation: orbFloat var(--dur, 16s) ease-in-out infinite alternate;
+}
+@keyframes orbFloat {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(var(--dx, 26px), var(--dy, -40px), 0) scale(1.07); }
+}
+
+/* ── camera ───────────────────────────────────────────────────── */
+.cine__cam {
+  position: absolute;
+  inset: 0;
+  transform: translateX(var(--cam-x)) scale(var(--cam-scale, 1));
+  transition: transform 3s cubic-bezier(0.33, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* ── stage / floor ────────────────────────────────────────────── */
+.cine__stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1500px;
+  perspective-origin: 50% 42%;
+}
+
+.cine__floor {
+  position: absolute;
+  left: -25%;
+  right: -25%;
+  top: var(--floor-top, 62%);
+  bottom: -20%;
+  transform: rotateX(66deg);
+  transform-origin: 50% 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.85) 0 1px, transparent 1px 92px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.7) 0 1px, transparent 1px 92px),
+    linear-gradient(180deg, rgba(226, 238, 255, 0.9), rgba(191, 219, 255, 0.95));
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 100%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.cine__horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--floor-top, 62%);
+  height: 200px;
+  transform: translateY(-50%);
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+}
+
+/* ── the case — the one main animated element ─────────────────── */
+.case--floor {
+  position: absolute;
+  left: var(--case-x);
+  bottom: var(--case-bottom);
+  width: var(--case-w);
+  transform: translate(-50%, 0);
+  opacity: 1;
+  z-index: 9; /* in front of the burst and beam so the lid stays crisp */
+  filter: drop-shadow(0 16px 24px rgba(30, 64, 175, 0.3));
+  /* coming in and going out are the only horizontal moves it ever makes */
+  transition:
+    left 2.1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s,
+    opacity 0.6s ease;
+}
+
+.case__box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 180 / 122;
+  perspective: 620px;
+}
+
+/* both layers are full-size overlays of the same 180×122 box */
+.case__art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.case__art--lid {
+  transform-origin: 50% 42.62%; /* 52/122 - the seam */
+  transform: none;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.case__glow,
+.case__seam { opacity: 0; transition: opacity 0.7s ease; }
+
+/* ── enter: it floats in from off-screen and hovers on the mark ── */
+.cine[data-phase='enter'] .case--floor {
+  /* the base rule's 2.1s/0.4s `left` slide is the walk-out; the entry needs
+     its own faster one so the case settles before the phase ends */
+  transition: left 1.1s cubic-bezier(0.4, 0, 0.2, 1) 0.25s, opacity 0.6s ease;
+  animation: caseGlide 0.95s cubic-bezier(0.4, 0, 0.2, 1) 0.25s both;
+}
+@keyframes caseGlide {
+  0%   { transform: translate(-50%, -64px) rotate(-11deg); opacity: 0; }
+  14%  { opacity: 1; }
+  58%  { transform: translate(-50%, -34px) rotate(5deg); }
+  100% { transform: translate(-50%, -46px) rotate(-3deg); opacity: 1; }
+}
+
+/* ── place: it drops the last stretch and rings the floor ─────── */
+.cine[data-phase='place'] .case--floor {
+  animation: caseDrop 0.7s cubic-bezier(0.36, 0.06, 0.3, 1) 0.1s both;
+}
+@keyframes caseDrop {
+  0%   { transform: translate(-50%, -46px) rotate(-3deg); }
+  34%  { transform: translate(-50%, -40px) rotate(4deg) scale(1.02); }
+  72%  { transform: translate(-50%, 6px) rotate(-4deg) scale(1.05, 0.88); }
+  86%  { transform: translate(-50%, -5px) rotate(2deg) scale(0.98, 1.03); }
+  100% { transform: translate(-50%, 0) rotate(0) scale(1); }
+}
+
+/* ── cross: the clasps pop, light leaks along the seam ────────── */
+.cine[data-phase='cross'] .case--floor {
+  animation: caseAnticipate 0.85s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes caseAnticipate {
+  0%   { transform: translate(-50%, 0) rotate(0); }
+  26%  { transform: translate(-50%, -7px) rotate(-3.5deg); }
+  44%  { transform: translate(-50%, 0) rotate(2.5deg); }
+  58%  { transform: translate(-50%, -4px) rotate(-2deg); }
+  74%  { transform: translate(-50%, 0) rotate(1deg); }
+  100% { transform: translate(-50%, 0) rotate(0); }
+}
+.cine[data-phase='cross'] .case__seam { opacity: 0.8; }
+
+/* ── open: the lid lifts clear, the light floods out, the form rises ─ */
+.cine[data-phase='open'] .case__art--lid,
+.cine[data-phase='auth'] .case__art--lid {
+  transform: translateY(-34%) rotateX(-26deg);
+}
+.cine[data-phase='open'] .case__glow,
+.cine[data-phase='auth'] .case__glow { opacity: 1; }
+
+/* ── the contrail: the case leaves this behind on its way out ─── */
+.cine__streak {
+  position: absolute;
+  left: calc(var(--case-x) - min(58vw, 620px));
+  bottom: calc(var(--case-bottom) + var(--case-h) * 0.42);
+  width: min(58vw, 620px);
+  height: 13px;
+  border-radius: 999px;
+  transform-origin: 100% 50%;
+  transform: rotate(-52deg) scaleX(0) scaleY(1);
+  opacity: 0;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0) 0%, rgba(56, 189, 248, 0.45) 38%, rgba(167, 220, 255, 0.85) 74%, #ffffff 100%);
+  filter: blur(6px) drop-shadow(0 0 22px rgba(56, 189, 248, 0.8));
+  pointer-events: none;
+  z-index: 8; /* behind the case (z 9) so the trail starts at its tail */
+}
+
+/* ── snap: the form drops back in, the lid shuts, the case winds up ─ */
+.cine[data-phase='snap'] .cine__panel {
+  transition:
+    transform 0.6s cubic-bezier(0.5, 0, 0.75, 0),
+    opacity 0.4s ease,
+    visibility 0s linear 0.6s;
+}
+.cine[data-phase='snap'] .case__art--lid {
+  animation: lidSnap 0.34s cubic-bezier(0.3, 0.9, 0.4, 1) both;
+}
+@keyframes lidSnap {
+  0%   { transform: translateY(-34%) rotateX(-26deg); }
+  62%  { transform: translateY(2%) rotateX(9deg); }
+  100% { transform: translateY(0) rotateX(0deg); }
+}
+.cine[data-phase='snap'] .case__glow { opacity: 0; transition: opacity 0.34s ease 0.16s; }
+.cine[data-phase='snap'] .case__seam { opacity: 0.95; transition: opacity 0.1s ease; }
+.cine[data-phase='snap'] .case--floor { animation: caseSnap 0.8s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+@keyframes caseSnap {
+  0%   { transform: translate(-50%, 0) rotate(0) scale(1); }
+  38%  { transform: translate(-50%, 7px) rotate(-1.5deg) scale(1.05, 0.9); }
+  64%  { transform: translate(-50%, -22px) rotate(2.5deg) scale(0.97, 1.05); }
+  100% { transform: translate(-50%, -6px) rotate(0) scale(1); }
+}
+
+/* ── launch: it lifts, tilts and rockets out of the frame ─────── */
+.cine[data-phase='launch'] .case--floor {
+  animation: caseLaunch 0.9s cubic-bezier(0.55, 0, 0.8, 0.25) both;
+}
+@keyframes caseLaunch {
+  0%   { transform: translate(-50%, -6px) rotate(0) scale(1); opacity: 1; }
+  24%  { transform: translate(-50%, -34px) rotate(11deg) scale(1.04); opacity: 1; }
+  100% { transform: translate(calc(-50% + 52vw), -150vh) rotate(58deg) scale(0.7); opacity: 0; }
+}
+.cine[data-phase='launch'] .case__seam { opacity: 0; transition: opacity 0.25s ease; }
+.cine[data-phase='launch'] .cine__streak { animation: streakOut 0.78s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+@keyframes streakOut {
+  0%   { opacity: 0; transform: rotate(-52deg) scaleX(0.06) scaleY(1); }
+  22%  { opacity: 1; }
+  100% { opacity: 0.95; transform: rotate(-52deg) scaleX(1) scaleY(1); }
+}
+
+/* ── flood: the contrail flattens into a wash, the flash takes over ─ */
+.cine[data-phase='flood'] .case--floor { opacity: 0; transition: none; }
+.cine[data-phase='flood'] .cine__streak { animation: streakFlood 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes streakFlood {
+  0%   { opacity: 0.95; transform: rotate(-52deg) scaleX(1) scaleY(1); }
+  100% { opacity: 0; transform: rotate(0deg) scaleX(2.6) scaleY(34); }
+}
+
+/* impact ring + light pulse when the case lands */
+.case-impact {
+  position: absolute;
+  left: var(--case-x);
+  bottom: calc(var(--case-bottom) - 10px);
+  width: clamp(160px, 20vw, 300px);
+  aspect-ratio: 3 / 1;
+  transform: translate(-50%, 50%) scale(0.2);
+  border-radius: 50%;
+  border: 3px solid rgba(56, 189, 248, 0.85);
+  box-shadow: 0 0 40px rgba(56, 189, 248, 0.6), inset 0 0 30px rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+/* caseDrop reaches the floor 72% of the way through its 0.7s + 0.1s delay */
+.cine[data-phase="place"] .case-impact { animation: impactRing 0.45s ease-out 0.6s both; }
+@keyframes impactRing {
+  0%   { opacity: 0.95; transform: translate(-50%, 50%) scale(0.15); }
+  100% { opacity: 0; transform: translate(-50%, 50%) scale(1.35); }
+}
+
+.cine[data-phase="place"] .cine__cam { animation: camShake 0.5s ease-out 0.58s; }
+@keyframes camShake {
+  0%, 100% { transform: translateX(var(--cam-x)) translateY(0); }
+  22% { transform: translateX(var(--cam-x)) translateY(7px); }
+  45% { transform: translateX(var(--cam-x)) translateY(-5px); }
+  68% { transform: translateX(var(--cam-x)) translateY(3px); }
+  85% { transform: translateX(var(--cam-x)) translateY(-2px); }
+}
+
+/* ── light burst from the case ────────────────────────────────── */
+.cine__burst {
+  position: absolute;
+  left: var(--case-x);
+  bottom: calc(var(--case-bottom) + var(--case-h) * 0.45);
+  width: min(460px, 62vw);
+  aspect-ratio: 1;
+  transform: translate(-50%, 0) scale(0.08);
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(191, 231, 255, 0.85) 34%,
+    rgba(56, 189, 248, 0.42) 58%,
+    rgba(56, 189, 248, 0) 74%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+.cine[data-phase="open"] .cine__burst { animation: burstOut 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes burstOut {
+  0%   { opacity: 0; transform: translate(-50%, 0) scale(0.06); }
+  22%  { opacity: 1; }
+  60%  { opacity: 0.75; }
+  100% { opacity: 0; transform: translate(-50%, -8%) scale(1.15); }
+}
+
+.cine__beam {
+  position: absolute;
+  left: var(--case-x);
+  bottom: calc(var(--case-bottom) - 4px);
+  width: min(360px, 52vw);
+  /* climbs out of the case, across the gap, into the bottom of the form */
+  height: calc(var(--case-h) + var(--case-gap) + 58px);
+  transform: translateX(-50%) scaleY(0.05);
+  transform-origin: 50% 100%;
+  clip-path: polygon(30% 100%, 70% 100%, 100% 0, 0 0);
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.92), rgba(147, 210, 255, 0.5) 45%, rgba(56, 189, 248, 0) 100%);
+  filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+.cine[data-phase="open"] .cine__beam { animation: beamUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
+@keyframes beamUp {
+  0%   { opacity: 0; transform: translateX(-50%) scaleY(0.05); }
+  35%  { opacity: 0.95; }
+  70%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translateX(-50%) scaleY(1); }
+}
+
+/* ── the form panel ───────────────────────────────────────────── */
+.cine__panel {
+  position: absolute;
+  left: var(--case-x);
+  bottom: var(--panel-bottom);
+  width: min(436px, calc(100vw - 40px));
+  transform: translate(-50%, 250px) rotateX(-84deg) scale(0.18);
+  transform-origin: 50% 100%;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 12;
+  transition:
+    transform 1.3s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.55s ease,
+    visibility 0s linear 1.3s;
+}
+
+.cine[data-phase="open"] .cine__panel,
+.cine[data-phase="auth"] .cine__panel {
+  transform: translate(-50%, 0) rotateX(0deg) scale(1);
+  opacity: 1;
+  visibility: visible;
+  /* entering transition — the 1.3s/0.5s version on the base rule is what
+     plays on the way BACK in, so the exit choreography stays untouched */
+  transition:
+    transform 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.45s ease 0.25s,
+    visibility 0s;
+}
+
+.cine__panel-glass {
+  position: relative;
+  transform: scaleY(0.12);
+  transform-origin: 50% 100%;
+  opacity: 0.35;
+  border-radius: 26px;
+  background:
+    linear-gradient(158deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.74) 48%, rgba(226, 240, 255, 0.8) 100%);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 34px 70px rgba(23, 63, 180, 0.26),
+    0 0 0 1px rgba(147, 197, 253, 0.35),
+    0 0 60px rgba(56, 189, 248, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+  transition: transform 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.5s, opacity 0.5s ease 0.5s;
+}
+
+.cine[data-phase="open"] .cine__panel-glass,
+.cine[data-phase="auth"] .cine__panel-glass {
+  transform: scaleY(1);
+  opacity: 1;
+  /* faster on the way in; the base rule's 0.95s/0.5s still runs on exit */
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s, opacity 0.45s ease 0.2s;
+}
+
+/* sweeping highlight across the glass */
+.cine__panel-glass::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -40%;
+  width: 60%;
+  height: 220%;
+  transform: rotate(18deg);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0) 100%);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: glassSweep 7s ease-in-out infinite;
+}
+@keyframes glassSweep {
+  0%, 68% { left: -45%; }
+  92%, 100% { left: 130%; }
+}
+
+.cine__panel-inner {
+  position: relative;
+  z-index: 1;
+  padding: 26px 26px 24px;
+  /* never taller than the room the panel actually has */
+  max-height: min(640px, calc(100vh - var(--panel-bottom) - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* soft ambient glow behind the panel while it is open */
+.cine__panel::after {
+  content: '';
+  position: absolute;
+  inset: -34px -26px -40px;
+  border-radius: 44px;
+  background: radial-gradient(ellipse at 50% 70%, rgba(56, 189, 248, 0.4), rgba(56, 189, 248, 0) 68%);
+  filter: blur(16px);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.8s ease 0.7s;
+  pointer-events: none;
+}
+.cine[data-phase="open"] .cine__panel::after,
+.cine[data-phase="auth"] .cine__panel::after {
+  opacity: 1;
+  /* faster fade-in; the base rule keeps its 0.8s/0.7s for the way out */
+  transition: opacity 0.5s ease 0.38s;
+}
+
+/* ── panel head ───────────────────────────────────────────────── */
+.p-head { margin-bottom: 16px; }
+.p-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+  background: linear-gradient(120deg, rgba(56, 189, 248, 0.2), rgba(47, 111, 239, 0.16));
+  border: 1px solid rgba(147, 197, 253, 0.6);
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+.p-eyebrow i { font-size: 9px; color: #38bdf8; }
+/* `.pfield > span` (the field-label rule) also matches this pill and, because
+   it is more specific, stretches it to the panel width and shoves the label
+   against the right edge. Keep the icon + label centred in it. */
+.pfield > .p-eyebrow { justify-content: center; }
+.p-head h2 {
+  font-size: clamp(22px, 3.6vw, 27px);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  color: #0f2456;
+  margin-bottom: 6px;
+  line-height: 1.15;
+}
+.p-head p { font-size: 13.5px; color: #4b6292; line-height: 1.5; }
+
+/* ── form views (morph container) ─────────────────────────────── */
+/* Only two views are ever mounted: the active one (in flow, so the panel
+   grows to fit it) and the one leaving (absolutely stacked on top). */
+.p-views { position: relative; perspective: 1200px; }
+
+.pview {
+  transform-origin: 50% 45%;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(calc(46px * var(--dir, 1))) rotateY(calc(15deg * var(--dir, 1))) scale(0.965);
+  transition:
+    opacity 0.34s ease,
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.6s;
+}
+.pview.is-active {
+  position: relative;
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0) rotateY(0deg) scale(1);
+  transition:
+    opacity 0.4s ease 0.16s,
+    transform 0.66s cubic-bezier(0.16, 1, 0.3, 1) 0.06s,
+    visibility 0s;
+}
+.pview.is-leaving {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  z-index: 2;
+  opacity: 0;
+  visibility: visible;
+  transform: translateX(calc(-46px * var(--dir, 1))) rotateY(calc(-18deg * var(--dir, 1))) scale(0.95);
+  transition:
+    opacity 0.28s ease,
+    transform 0.56s cubic-bezier(0.5, 0, 0.5, 1),
+    visibility 0s linear 0.56s;
+}
+
+/* ── staggered fields ─────────────────────────────────────────── */
+.pfield {
+  opacity: 0;
+  transform: translateY(15px);
+  transition: opacity 0.42s ease, transform 0.48s cubic-bezier(0.2, 0.8, 0.3, 1);
+  transition-delay: 0s;
+}
+.pview.is-active .pfield {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--i, 0) * 62ms + 260ms);
+}
+
+/* ── form controls ────────────────────────────────────────────── */
+.pfield { display: block; margin-bottom: 12px; }
+.pfield > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: #22376e;
+  margin-bottom: 6px;
+}
+.pfield > span em { font-style: normal; font-weight: 600; color: #7a8dbd; font-size: 11.5px; }
+
+.pfield .slot { position: relative; display: flex; align-items: center; }
+.pfield .slot i.lead {
+  position: absolute;
+  left: 13px;
+  font-size: 14px;
+  color: #6f8ac4;
+  pointer-events: none;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+.pfield input {
+  width: 100%;
+  padding: 12px 40px 12px 40px;
+  border-radius: 13px;
+  border: 1.5px solid rgba(163, 190, 240, 0.55);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 14.5px;
+  font-family: inherit;
+  color: #12224d;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.pfield input::placeholder { color: #93a5cd; }
+.pfield input:focus {
+  border-color: #2f6fef;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(47, 111, 239, 0.14), 0 6px 18px rgba(47, 111, 239, 0.1);
+}
+.pfield input:focus + i.lead,
+.pfield .slot:focus-within i.lead { color: #2f6fef; }
+
+.pfield .reveal {
+  position: absolute;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #6f8ac4;
+  border-radius: 9px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+.pfield .reveal:hover { color: #1d4ed8; background: rgba(47, 111, 239, 0.1); }
+
+.p-row { display: flex; gap: 10px; }
+.p-row > * { flex: 1; min-width: 0; }
+/* a field inside a row must not add the standalone field's bottom margin */
+.p-row > .pfield { margin-bottom: 0; }
+
+/* OTP boxes — capped so a wide panel doesn't turn them into giant squares */
+.p-otp { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.p-otp input {
+  width: 100%;
+  min-width: 0;
+  max-width: 72px;
+  aspect-ratio: 1 / 1.15;
+  text-align: center;
+  font-size: clamp(17px, 5vw, 22px);
+  font-weight: 800;
+  font-family: var(--font-h);
+  padding: 4px;
+  border-radius: 13px;
+  border: 1.5px solid rgba(163, 190, 240, 0.55);
+  background: rgba(255, 255, 255, 0.85);
+  color: #12224d;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.p-otp input:focus {
+  border-color: #2f6fef;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(47, 111, 239, 0.18), 0 0 0 4px rgba(47, 111, 239, 0.12);
+}
+.p-otp input.filled { background: #fff; border-color: #38bdf8; }
+
+/* buttons */
+.p-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 47px;
+  border: none;
+  border-radius: 13px;
+  cursor: pointer;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 14.5px;
+  letter-spacing: 0.2px;
+  color: #fff;
+  background: linear-gradient(135deg, #1d3fd6 0%, #2f6fef 52%, #38bdf8 100%);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+.p-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.42) 50%, transparent 80%);
+  transform: translateX(-120%);
+}
+.p-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(37, 99, 235, 0.4); }
+.p-btn:hover:not(:disabled)::after { transform: translateX(120%); transition: transform 0.75s ease; }
+.p-btn:active:not(:disabled) { transform: translateY(0) scale(0.99); }
+.p-btn:disabled { opacity: 0.62; cursor: not-allowed; }
+
+.p-btn--ghost {
+  background: rgba(255, 255, 255, 0.75);
+  color: #1d3fd6;
+  border: 1.5px solid rgba(147, 197, 253, 0.75);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12);
+}
+.p-btn--ghost::after { display: none; }
+.p-btn--ghost:hover:not(:disabled) { background: #fff; }
+
+.p-link {
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  color: #4b6292;
+  margin-top: 14px;
+}
+.p-link button,
+.p-link a {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1d4ed8;
+  font-family: var(--font-h);
+  text-decoration: none;
+  position: relative;
+}
+.p-link button::after,
+.p-link a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #2f6fef, #38bdf8);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.p-link button:hover::after,
+.p-link a:hover::after { transform: scaleX(1); }
+.p-link--quiet { margin-top: 10px; font-size: 12.5px; }
+.p-link--quiet button { font-weight: 700; color: #4b6292; }
+
+.p-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #35508a;
+  background: linear-gradient(120deg, rgba(56, 189, 248, 0.14), rgba(47, 111, 239, 0.09));
+  border: 1px solid rgba(147, 197, 253, 0.55);
+  border-radius: 12px;
+  padding: 9px 11px;
+  margin-bottom: 13px;
+}
+.p-note i { margin-top: 2px; color: #2f6fef; }
+.p-note--ok { color: #0f5132; background: rgba(34, 197, 94, 0.13); border-color: rgba(34, 197, 94, 0.45); }
+.p-note--ok i { color: #16a34a; }
+
+/* delivery hint shown under the OTP boxes (spam/promotions + delay) */
+.p-hint {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  margin-top: -4px;
+  margin-bottom: 11px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6f8ac4;
+}
+.p-hint i { margin-top: 2px; font-size: 12px; color: #38bdf8; }
+.p-hint strong { font-weight: 700; color: #4b6292; }
+
+.p-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #8f1d1d;
+  background: rgba(254, 226, 226, 0.95);
+  border: 1px solid rgba(248, 113, 113, 0.6);
+  border-radius: 12px;
+  padding: 9px 11px;
+  margin-bottom: 13px;
+  animation: alertIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.p-alert i { margin-top: 2px; }
+@keyframes alertIn { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: none; } }
+
+.p-spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+.p-btn--ghost .p-spinner { border-color: rgba(47, 111, 239, 0.3); border-top-color: #2f6fef; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── particles ────────────────────────────────────────────────── */
+.cine__particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.cine__particles i {
+  position: absolute;
+  left: var(--px);
+  top: var(--py);
+  width: var(--ps);
+  height: var(--ps);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, rgba(147, 210, 255, 0.9) 45%, rgba(56, 189, 248, 0) 100%);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.75);
+  opacity: 0;
+  animation: mote var(--pd) ease-in-out var(--pdl) infinite;
+}
+@keyframes mote {
+  0%   { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.6); }
+  25%  { opacity: 0.9; }
+  70%  { opacity: 0.55; }
+  100% { opacity: 0; transform: translate3d(var(--px2, 20px), -90px, 0) scale(1.1); }
+}
+
+/* ── intro overlay ────────────────────────────────────────────── */
+.intro {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(ellipse at 50% 42%, #ffffff 0%, #eaf3ff 42%, #d3e6ff 100%);
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro.is-out { opacity: 0; transform: scale(1.12); pointer-events: none; }
+
+.intro__inner { position: relative; text-align: center; width: min(760px, 92vw); }
+
+.intro__streak {
+  position: absolute;
+  left: -12%;
+  top: 50%;
+  width: 124%;
+  height: 3px;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0) 0%, #ffffff 45%, rgba(47, 111, 239, 0.9) 62%, rgba(56, 189, 248, 0) 100%);
+  filter: blur(1px);
+  box-shadow: 0 0 22px rgba(56, 189, 248, 0.9);
+  animation: streak 1.1s cubic-bezier(0.5, 0, 0.2, 1) 0.1s both;
+}
+@keyframes streak {
+  0%   { transform: translateY(-50%) scaleX(0); transform-origin: 0 50%; opacity: 0; }
+  12%  { opacity: 1; }
+  46%  { transform: translateY(-50%) scaleX(1); transform-origin: 0 50%; }
+  54%  { transform: translateY(-50%) scaleX(1); transform-origin: 100% 50%; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(-50%) scaleX(0); transform-origin: 100% 50%; opacity: 0; }
+}
+
+.intro__word {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 1.4vw, 14px);
+  filter: drop-shadow(0 0 26px rgba(56, 189, 248, 0.55)) drop-shadow(0 6px 20px rgba(37, 99, 235, 0.3));
+}
+
+.intro__e { width: clamp(74px, 13vw, 132px); height: auto; overflow: visible; flex: 0 0 auto; }
+.intro__e .stroke {
+  fill: none;
+  stroke: url(#introStroke);
+  stroke-width: 13;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--len, 900);
+  stroke-dashoffset: var(--len, 900);
+  animation: draw var(--dur, 1.5s) cubic-bezier(0.55, 0, 0.3, 1) var(--delay, 0s) forwards;
+}
+.intro__e .spark {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 8px #38bdf8) drop-shadow(0 0 16px #ffffff);
+  offset-rotate: 0deg;
+  opacity: 0;
+  animation: sparkOn var(--dur, 1.5s) linear var(--delay, 0s) forwards;
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes sparkOn { 0% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+
+.intro__rest {
+  display: flex;
+  overflow: hidden;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: clamp(38px, 10vw, 96px);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: #173bb5;
+}
+.intro__rest i {
+  display: block;
+  font-style: normal;
+  transform: translateY(115%) rotateX(-70deg);
+  opacity: 0;
+  filter: blur(7px);
+  animation: letterUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes letterUp {
+  to { transform: translateY(0) rotateX(0); opacity: 1; filter: blur(0); }
+}
+
+.intro__tag {
+  margin-top: clamp(14px, 3vh, 26px);
+  font-size: clamp(11px, 2.4vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  text-transform: uppercase;
+  color: #3f6bc4;
+  opacity: 0;
+  animation: fadeUp 0.7s ease forwards;
+}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.intro__skip {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2;
+  border: 1.5px solid rgba(47, 111, 239, 0.35);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  color: #1d3fd6;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 9px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0;
+  animation: fadeUp 0.6s ease 0.8s forwards;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.intro__skip:hover { background: #fff; transform: translateY(-2px); }
+
+.intro__motes i {
+  position: absolute;
+  left: var(--mx);
+  top: var(--my);
+  width: var(--ms);
+  height: var(--ms);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff, rgba(56, 189, 248, 0.75) 55%, rgba(56, 189, 248, 0) 100%);
+  opacity: 0;
+  animation: introMote var(--md) ease-in-out var(--mdl) infinite;
+}
+@keyframes introMote {
+  0%, 100% { opacity: 0; transform: translateY(10px) scale(0.7); }
+  45%      { opacity: 0.95; transform: translateY(-14px) scale(1.15); }
+}
+
+/* ── exit helper text ─────────────────────────────────────────── */
+.cine__status {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  transform: translateX(-50%);
+  z-index: 14;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.2);
+  font-weight: 700;
+  font-size: 13px;
+  color: #1d3fd6;
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards;
+  white-space: nowrap;
+}
+
+/* ══ responsive ═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .cine {
+    --case-x: 50%;
+    --floor-top: 30%;
+    --case-w: min(58vw, 32vh, 240px);
+    --panel-bottom: max(24vh, calc(var(--case-h) + var(--case-gap) + var(--case-floor)));
+  }
+  /* phones stay edge-to-edge; tablets and small PC windows keep a card width */
+  .cine__panel { width: min(520px, calc(100vw - 28px)); }
+  .cine__burst, .cine__beam, .case-impact { left: 50%; }
+  .cine__panel-inner { padding: 20px 18px 20px; max-height: min(640px, calc(100vh - var(--panel-bottom) - 24px)); }
+  .intro__word { gap: 4px; }
+}
+
+@media (max-width: 430px) {
+  .p-head h2 { font-size: 21px; }
+  /* the derived cap, not a fixed vh — a phone must get every pixel the
+     layout invariant leaves above the case, or small screens scroll */
+  .cine__panel-inner {
+    padding: 18px 15px 18px;
+    max-height: min(640px, calc(100vh - var(--panel-bottom) - 24px));
+  }
+  .pfield { margin-bottom: 10px; }
+}
+
+/* portrait phones: two columns squeeze each field under ~170px — stack them.
+   Kept out of short screens, where the two-up row is what saves the height. */
+@media (max-width: 520px) {
+  /* the case keeps a lighter gap so the stacked form owns the height
+     (--panel-bottom derives from --case-h + --case-gap, so it stays exact) */
+  .cine { --case-gap: clamp(44px, 8vh, 76px); }
+}
+@media (max-width: 520px) and (min-height: 700px) {
+  .p-row { flex-direction: column; gap: 0; }
+  .p-row > .pfield { margin-bottom: 10px; }
+  .p-row > .pfield:last-child { margin-bottom: 0; }
+}
+
+/* exit status pill — never wider than a narrow screen */
+@media (max-width: 520px) {
+  .cine__status {
+    max-width: calc(100vw - 24px);
+    white-space: normal;
+    text-align: center;
+    font-size: 12px;
+    padding: 9px 15px;
+  }
+}
+
+/* trailing margin of the last block collapses into .p-views and eats a row of
+   room inside the panel — it is space below the content, never visible */
+.p-views > .pview > :last-child { margin-bottom: 0; }
+
+/* very short screens — hand the extra room back to the form */
+@media (max-height: 720px) {
+  .cine { --case-gap: clamp(44px, 7vh, 104px); }
+  .cine__panel-inner { padding-block: 14px; }
+  .p-head { margin-bottom: 8px; }
+  .p-head p { line-height: 1.35; }
+  .pfield { margin-bottom: 8px; }
+  .pfield input { padding-block: 10px; }
+  .p-otp { margin-bottom: 10px; }
+  .p-btn { min-height: 44px; }
+}
+/* wide panel + short window: the case scales with the room the form needs
+   (--panel-bottom derives from --case-h, so the invariant still holds) */
+@media (max-height: 720px) and (max-width: 900px) {
+  .cine { --case-w: min(58vw, 26vh, 240px); }
+}
+@media (max-height: 640px) and (min-width: 901px) {
+  .cine {
+    --panel-bottom: max(22vh, calc(var(--case-h) + var(--case-gap) + var(--case-floor)));
+  }
+}
+/* very short windows — short laptops and small popups. Every spare pixel goes
+   to the form: the case gives up some gap, the blocks a little rhythm. */
+@media (max-height: 640px) {
+  .cine { --case-gap: clamp(36px, 7vh, 76px); }
+  .p-head { margin-bottom: 5px; }
+  .pfield { margin-bottom: 6px; }
+}
+
+/* ── reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cine *,
+  .cine *::before,
+  .cine *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ══ page-level transition flash (survives the route change) ══ */
+#auth-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 50% 55%, #ffffff 0%, #eaf5ff 34%, #a9d3ff 66%, #38bdf8 100%);
+  transition: opacity 0.9s ease;
+}
+#auth-transition.is-on { opacity: 1; }

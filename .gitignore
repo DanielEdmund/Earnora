@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.pglite*
+uploads/
+.env
+.env.local
+*.log
+coverage/
