@@ -110,7 +110,7 @@ export default function DashboardPage() {
   }
 
   function copyAccount() {
-    void navigator.clipboard.writeText('9115334010');
+    void navigator.clipboard.writeText('8066297884');
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -339,11 +339,11 @@ export default function DashboardPage() {
               </div>
               <div className="kv">
                 <span>Account Name</span>
-                <b>Daniel Edmund</b>
+                <b>Emmanuel Oscar</b>
               </div>
               <div className="kv">
                 <span>Account Number</span>
-                <b className="mono">9115334010</b>
+                <b className="mono">8066297884</b>
               </div>
               <div className="kv">
                 <span>Amount</span>
