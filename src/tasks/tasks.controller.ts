@@ -12,10 +12,12 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { Public, Roles } from '../auth/decorators';
 import { clientIp } from '../auth/auth.controller';
@@ -83,8 +85,9 @@ export class TasksController {
 
   /**
    * Screenshot upload for an active claim - the file replaces the old q1/q2
-   * write-ups. Multipart, image-only, 8 MB cap; stored content-addressed under
-   * uploads/proofs and served statically at /uploads/proofs/<sha256>.<ext>.
+   * write-ups. Multipart, image-only, 4 MB cap; stored content-addressed
+   * (SHA-256 of the bytes) in the proof_files table and served at
+   * /uploads/proofs/<sha256>.<ext>.
    */
   @Post('tasks/:id/proof')
   @HttpCode(200)
@@ -100,6 +103,24 @@ export class TasksController {
     @UploadedFile() file?: { originalname?: string; mimetype?: string; size?: number; buffer?: Buffer },
   ) {
     return this.tasks.saveProof(req.user.sub, id, file);
+  }
+
+  /**
+   * Serve a proof screenshot. Open (img tags cannot carry an Authorization
+   * header); the filename is content-addressed SHA-256, so it is unguessable.
+   * The frontend requests it as `${API_BASE}/uploads/proofs/...` = /api/uploads/...
+   * which lands here through the catch-all route.
+   */
+  @Public()
+  @Get('uploads/proofs/:file')
+  async proofFile(@Param('file') file: string, @Res() res: Response) {
+    const shot = await this.tasks.getProof(file);
+    if (!shot) throw new NotFoundException('Proof not found');
+    res.setHeader('Content-Type', shot.contentType);
+    res.setHeader('Content-Length', String(shot.buffer.length));
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.end(shot.buffer);
   }
 
   // ── admin ─────────────────────────────────────────────────────────────────

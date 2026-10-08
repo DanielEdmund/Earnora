@@ -91,7 +91,7 @@ describe('screenshot proof', () => {
     expect(detectImage(Buffer.from('MZ\x90\x00 this is not an image at all'))).toBeNull();
     expect(detectImage(Buffer.from([0x89, 0x50]))).toBeNull();
     expect(detectImage(undefined)).toBeNull();
-    expect(MAX_PROOF_BYTES).toBe(8 * 1024 * 1024);
+    expect(MAX_PROOF_BYTES).toBe(4 * 1024 * 1024);
   });
 
   test('only our own content-addressed upload URLs are accepted as screenshots', () => {

@@ -3,12 +3,22 @@
  * and auto-validation. Kept pure (no DB / fs) so unit tests can cover them.
  */
 
-export const MAX_PROOF_BYTES = 8 * 1024 * 1024; // 8 MB
+// 4 MB: the serverless edge (Vercel) rejects request bodies over 4.5 MB, so a
+// bigger cap would fail at the platform before it ever reached this code.
+export const MAX_PROOF_BYTES = 4 * 1024 * 1024; // 4 MB
 
 /** Proof URLs we issue ourselves (content-addressed SHA-256 hex); rejects traversal / foreign hosts. */
 export const PROOF_URL_RE = /^\/uploads\/proofs\/[a-f0-9]{64}\.(png|jpe?g|webp|gif)$/;
 
 export type ImageKind = 'png' | 'jpg' | 'webp' | 'gif';
+
+/** Response content-type per stored proof extension. */
+export const PROOF_MIME: Record<ImageKind, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+};
 
 /** Identify an image by magic bytes (never trust the client's content-type). */
 export function detectImage(buf: Buffer | undefined | null): ImageKind | null {

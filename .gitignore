@@ -4,5 +4,9 @@ dist/
 uploads/
 .env
 .env.local
+.vercel/
 *.log
 coverage/
+
+.vercel
+.env*

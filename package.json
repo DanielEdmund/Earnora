@@ -11,6 +11,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node scripts/start-prod.cjs",
     "prestart:prod": "npm run build",
+    "migrate": "node scripts/migrate.mjs",
     "lint": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
@@ -27,7 +28,8 @@
     "nodemailer": "^10.0.12",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "serverless-http": "^4.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.2",

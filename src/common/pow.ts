@@ -1,29 +1,40 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { config } from '../config';
-import { CacheService } from './cache';
+import { DB, Db } from './db';
 
 /**
  * Server-issued proof-of-work challenges defeat dumb claim scripts:
  * the client must burn CPU to echo a nonce whose SHA-256 has N leading zeros.
+ *
+ * Challenges live in the database (not the per-process cache) because the API
+ * can run on several serverless instances at once: the instance that issued the
+ * challenge may not be the one that verifies the claim. Single-use is enforced
+ * with an atomic `DELETE … RETURNING`, so a replay loses the race and fails.
  */
 @Injectable()
 export class PowService {
-  constructor(@Inject(CacheService) private readonly cache: CacheService) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   async issue(userId: string): Promise<{ challenge: string; bits: number; ttlSec: number }> {
     const challenge = randomBytes(16).toString('hex');
     const ttlSec = 60;
-    await this.cache.set(`pow:${userId}:${challenge}`, '1', ttlSec);
+    // sweep expired rows on the way past (tiny table: only the last 60s live here)
+    await this.db.query(`DELETE FROM pow_challenges WHERE expires_at < now()`);
+    await this.db.query(
+      `INSERT INTO pow_challenges (id, user_id, expires_at) VALUES ($1, $2, now() + make_interval(secs => $3))`,
+      [challenge, userId, ttlSec],
+    );
     return { challenge, bits: config.fraud.powDifficultyBits, ttlSec };
   }
 
   async verify(userId: string, challenge: string, nonce: string): Promise<void> {
     if (!challenge || !nonce) throw new BadRequestException('Missing proof-of-work (x-pow-challenge / x-pow-nonce)');
-    const key = `pow:${userId}:${challenge}`;
-    const ok = await this.cache.get(key);
-    if (!ok) throw new BadRequestException('Proof-of-work challenge expired or unknown');
-    await this.cache.del(key); // single-use
+    const r = await this.db.query<{ id: string }>(
+      `DELETE FROM pow_challenges WHERE id = $1 AND user_id = $2 AND expires_at > now() RETURNING id`,
+      [challenge, userId],
+    );
+    if (r.rows.length === 0) throw new BadRequestException('Proof-of-work challenge expired or unknown');
 
     const digest = createHash('sha256').update(`${challenge}:${nonce}`).digest();
     if (!hasLeadingZeroBits(digest, config.fraud.powDifficultyBits)) {

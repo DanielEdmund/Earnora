@@ -93,6 +93,54 @@ docker compose up -d
 
 Copy `.env.example` → `.env` to tune windows, fees, fraud limits.
 
+## Deploying to Vercel (one project, one URL)
+
+The whole stack ships as a **single Vercel project rooted at `web/`** — no second
+service, no separate API host:
+
+- The browser keeps calling same-origin `/api/*`. `web/app/api/[...path]/route.js`
+  is a catch-all route handler that loads the **prebuilt NestJS app in-process**
+  (`src/serverless.ts` via `serverless-http`) and serves it as one serverless
+  function (Node runtime, 60s max duration).
+- **Off Vercel** the same route handler forwards to `API_PROXY_ORIGIN`
+  (default `http://localhost:3000`), so `npm run dev` behaves exactly as before —
+  two processes, API on :3000, web on :3001.
+- **Database**: set `DATABASE_URL` (e.g. Neon pooled `postgres://…?sslmode=require`).
+  Without it the app falls back to embedded PGlite, which has no persistent disk on
+  Vercel — always set it.
+- **Migrations** run at boot when the `migrations/` folder is present; on Vercel it
+  is not part of the function bundle, so apply them once from your machine first:
+  ```bash
+  npm run build
+  DATABASE_URL=postgres://… npm run migrate   # idempotent (schema_migrations)
+  ```
+- **Background workers** (outbox relay, payout batcher, task janitor) have no
+  `setInterval` on Vercel: they are ticked after responses (throttled, ~45s) plus a
+  daily safety-net cron (`web/vercel.json`, `0 16 * * *` UTC — the Hobby plan only
+  allows one cron per day; the endpoint requires `Authorization: Bearer $CRON_SECRET`
+  or `?secret=`).
+- **Proof screenshots** live in the `proof_files` table (bytes), not on disk —
+  serverless filesystems are read-only and ephemeral. Upload cap is **4 MB**
+  (Vercel's 4.5 MB request-body limit).
+- **Environment variables** (Project → Settings → Environment Variables):
+
+  | Variable | Notes |
+  |---|---|
+  | `DATABASE_URL` | required — pooled Postgres connection string |
+  | `JWT_SECRET` | required — ≥ 32 random chars (production refuses short/dev values) |
+  | `ADMIN_PASSWORD` | required — strong; boot re-hashes `admin@earnora.local`'s login |
+  | `CRON_SECRET` | required — protects `GET /api/cron/tick` |
+  | `WEBHOOK_SECRET` | required only when `PSP_MODE` ≠ `simulated` |
+  | `SEED_DEMO` | `false` in production |
+  | `SMTP_HOST/PORT/USER/PASSWORD/FROM` | optional but needed for password-reset emails |
+
+  ```bash
+  cd web
+  vercel link                       # scope + project (root directory = web/)
+  vercel env add DATABASE_URL production
+  vercel --prod                     # buildCommand runs the API + web builds
+  ```
+
 ## Demo walkthrough (curl)
 
 ```bash

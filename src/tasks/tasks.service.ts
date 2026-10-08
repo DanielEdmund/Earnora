@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   BadRequestException,
@@ -17,7 +17,7 @@ import { TOPICS, OutboxService } from '../common/events';
 import { assertClaimVelocity, trustOf } from '../fraud/fraud';
 import { PowService } from '../common/pow';
 import { COUNTED_CLAIM_STATES, LAGOS_DAY_START_SQL, planDef } from '../plans/plans';
-import { detectImage, MAX_PROOF_BYTES, screenshotOf, structuralFailure } from './proof';
+import { detectImage, ImageKind, MAX_PROOF_BYTES, PROOF_MIME, screenshotOf, structuralFailure } from './proof';
 import { postTransaction } from '../wallet/ledger';
 
 const ACTIVE_CLAIM_STATES = `('claimed','submitted','queued_review','approved')`;
@@ -175,16 +175,54 @@ export class TasksService {
 
     const sha256 = createHash('sha256').update(file.buffer).digest('hex');
     const filename = `${sha256}.${kind}`;
-    const dir = join(process.cwd(), 'uploads', 'proofs');
-    mkdirSync(dir, { recursive: true });
-    const dest = join(dir, filename);
-    if (!existsSync(dest)) writeFileSync(dest, file.buffer);
+    // Primary store: the database — survives read-only/ephemeral serverless
+    // filesystems and is visible from every function instance.
+    await this.db.query(
+      `INSERT INTO proof_files (sha256, ext, bytes) VALUES ($1, $2, $3)
+       ON CONFLICT (sha256) DO NOTHING`,
+      [sha256, kind, file.buffer],
+    );
+    // Best-effort local disk copy (static serving / older installs); silently
+    // skipped where the filesystem is read-only, the DB row is authoritative.
+    try {
+      const dir = join(process.cwd(), 'uploads', 'proofs');
+      mkdirSync(dir, { recursive: true });
+      const dest = join(dir, filename);
+      if (!existsSync(dest)) writeFileSync(dest, file.buffer);
+    } catch {
+      /* serverless read-only fs */
+    }
     return {
       url: `/uploads/proofs/${filename}`,
       name: (file.originalname || filename).slice(0, 120),
       size: file.buffer.length,
       sha256,
     };
+  }
+
+  /**
+   * Content-addressed screenshot bytes for GET /uploads/proofs/<sha256>.<ext>.
+   * Strict filename check (no traversal), DB first, legacy disk copy as fallback.
+   */
+  async getProof(file: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+    const m = /^([a-f0-9]{64})\.(png|jpg|webp|gif)$/.exec(file);
+    if (!m) return null;
+    const contentType = PROOF_MIME[m[2] as ImageKind];
+    const r = await this.db.query<{ bytes: Buffer | Uint8Array }>(
+      `SELECT bytes FROM proof_files WHERE sha256 = $1 AND ext = $2`,
+      [m[1], m[2]],
+    );
+    if (r.rows.length > 0) {
+      const bytes = r.rows[0].bytes;
+      return { buffer: Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes), contentType };
+    }
+    try {
+      const p = join(process.cwd(), 'uploads', 'proofs', file);
+      if (existsSync(p)) return { buffer: readFileSync(p), contentType };
+    } catch {
+      /* unreadable dir */
+    }
+    return null;
   }
 
   /**

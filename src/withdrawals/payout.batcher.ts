@@ -28,7 +28,13 @@ export class PayoutBatcher implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  private async tick(): Promise<void> {
+  /**
+   * One drain pass. Called on a timer in a long-lived process, and by the
+   * serverless cron (/api/cron/tick) on Vercel where no timer survives.
+   * Public on purpose — SKIP LOCKED + claim-on-update make it safe to call
+   * from any instance, at any time, concurrently.
+   */
+  async tick(): Promise<void> {
     if (this.running) return;
     // hard gate: rails only run inside the window unless explicitly overridden
     if (!isWindowOpen(config.withdrawal.window, config.withdrawal.tz) && !config.payoutOutsideWindow) {

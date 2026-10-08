@@ -68,7 +68,7 @@ type AttemptOpts = { timeoutMs: number; delays: number[] };
 // ~9s total retry window: rides out a `nest --watch` recompile or a crash
 // restart without leaving a button spinning forever.
 const DEFAULT_ATTEMPTS: AttemptOpts = { timeoutMs: 6000, delays: [600, 1200, 2400, 4800] };
-// Uploads get a longer leash (8MB over a slow phone connection) but fewer tries.
+// Uploads get a longer leash (4MB over a slow phone connection) but fewer tries.
 const UPLOAD_ATTEMPTS: AttemptOpts = { timeoutMs: 25000, delays: [800, 1600] };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

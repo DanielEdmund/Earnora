@@ -18,7 +18,11 @@ export class TasksWorker implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  private async tick(): Promise<void> {
+  /**
+   * One janitor pass. Also invoked by the serverless cron (/api/cron/tick)
+   * when there is no long-lived process to run the interval.
+   */
+  async tick(): Promise<void> {
     try {
       const expired = await this.tasks.expireStaleClaims();
       if (expired > 0) this.log.log(`expired ${expired} stale claim(s), quota released`);

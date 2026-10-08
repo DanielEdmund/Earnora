@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci --include=dev --no-audit --no-fund && cd .. && npm ci --include=dev --no-audit --no-fund",
+  "buildCommand": "cd .. && npm run build && cd web && npm run build",
+  "crons": [
+    {
+      "path": "/api/cron/tick",
+      "schedule": "0 16 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/**/route.js": {
+      "maxDuration": 60
+    }
+  }
+}

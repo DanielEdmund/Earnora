@@ -36,7 +36,8 @@ interface Claim {
   validation_rules: { requiredFields?: string[]; minChars?: number; proof?: string } | string;
 }
 
-const MAX_PROOF_MB = 8;
+// 4 MB, not 8: Vercel rejects request bodies over 4.5 MB at the edge.
+const MAX_PROOF_MB = 4;
 const PROOF_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
 
 export default function TasksPage() {
