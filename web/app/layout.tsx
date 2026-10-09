@@ -25,6 +25,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
         />
+        {/* Google AdSense site verification — must be present on every page */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4649059465113958"
+          crossOrigin="anonymous"
+        ></script>
       </head>
       <body suppressHydrationWarning>
         {children}
