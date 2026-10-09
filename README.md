@@ -109,10 +109,13 @@ service, no separate API host:
   Without it the app falls back to embedded PGlite, which has no persistent disk on
   Vercel — always set it.
 - **Migrations** run at boot when the `migrations/` folder is present; on Vercel it
-  is not part of the function bundle, so apply them once from your machine first:
+  is not part of the function bundle, so `web/vercel.json` runs `npm run migrate`
+  as part of **every build** (`buildCommand`) — deploys apply pending migrations
+  automatically, right after `nest build` and before `next build`. You can still
+  apply them by hand (idempotent, tracked in `schema_migrations`):
   ```bash
   npm run build
-  DATABASE_URL=postgres://… npm run migrate   # idempotent (schema_migrations)
+  DATABASE_URL=postgres://… npm run migrate
   ```
 - **Background workers** (outbox relay, payout batcher, task janitor) have no
   `setInterval` on Vercel: they are ticked after responses (throttled, ~45s) plus a

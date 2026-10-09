@@ -18,11 +18,11 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { Public, Roles } from '../auth/decorators';
 import { clientIp } from '../auth/auth.controller';
 import { DB, Db } from '../common/db';
-import { MAX_PLAN_REWARD_KOBO } from '../plans/plans';
+import { MAX_PLAN_REWARD_KOBO, PLAN_KEYS } from '../plans/plans';
 import { MAX_PROOF_BYTES } from './proof';
 import { TasksService } from './tasks.service';
 class CreateTaskDto {
@@ -35,6 +35,8 @@ class CreateTaskDto {
   @IsOptional() @IsBoolean() requiresAdmin?: boolean;
   @IsOptional() @IsObject() validationRules?: Record<string, unknown>;
   @IsOptional() @IsString() link?: string; // URL users must open/follow (social tasks, ads, referrals)
+  /** Scoping: which plan's feed this task appears in (omit = every plan). */
+  @IsOptional() @IsIn(PLAN_KEYS) planKey?: string;
 }
 
 class SubmitDto {
@@ -140,8 +142,8 @@ export class TasksController {
     const link = rawLink ? (/^https?:\/\//i.test(rawLink) ? rawLink : `https://${rawLink}`) : null;
     const r = await this.db.query(
       `INSERT INTO tasks (advertiser_id, title, description, category, reward_kobo, budget_kobo, quota,
-                          requires_admin, validation_rules, link)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+                          requires_admin, validation_rules, link, plan_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
        RETURNING *`,
       [
         req.user.sub,
@@ -154,6 +156,7 @@ export class TasksController {
         dto.requiresAdmin ?? false,
         JSON.stringify(dto.validationRules ?? {}),
         link,
+        dto.planKey ?? null,
       ],
     );
     return r.rows[0];
@@ -207,11 +210,23 @@ export class TasksController {
     return { task: r.rows[0], claims: claims.rows };
   }
 
+  /**
+   * Delete a task outright (owner request: unwanted tasks must disappear from
+   * the admin list, not just go stale). Claims go first so the FK is satisfied;
+   * money already paid through the ledger is untouched (the ledger is
+   * append-only and has no FK to tasks/claims).
+   */
   @Roles('admin')
   @Delete('admin/tasks/:id')
-  async closeTask(@Param('id') id: string) {
-    const r = await this.db.query(`UPDATE tasks SET status = 'closed' WHERE id = $1 RETURNING id`, [id]);
-    if (r.rows.length === 0) throw new NotFoundException('Task not found');
-    return { closed: true };
+  async deleteTask(@Param('id') id: string) {
+    const deleted = await this.db.transaction(async (q) => {
+      const t = await q(`SELECT id FROM tasks WHERE id = $1 FOR UPDATE`, [id]);
+      if (t.rows.length === 0) return false;
+      await q(`DELETE FROM task_claims WHERE task_id = $1`, [id]);
+      await q(`DELETE FROM tasks WHERE id = $1`, [id]);
+      return true;
+    });
+    if (!deleted) throw new NotFoundException('Task not found');
+    return { deleted: true };
   }
 }

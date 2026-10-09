@@ -56,6 +56,8 @@ interface TopTask {
   title: string;
   link: string | null;
   category: string;
+  /** Which plan's feed the task belongs to; null/undefined = every plan. */
+  plan_key?: string | null;
   status: string;
   quota: number;
   claimed_count: number;
@@ -302,6 +304,7 @@ export default function AdminPage() {
     description: '',
     link: '',
     category: 'ad_click',
+    planKey: '', // '' = every plan; 'beginner' | 'intermediate' | 'extreme'
     rewardNaira: '300',
     budgetNaira: '300000',
     quota: '100',
@@ -497,12 +500,12 @@ export default function AdminPage() {
     }
   }
 
-  async function closeTask(id: string, title: string) {
-    if (!window.confirm(`Close “${title}”? Existing claims keep their state, but nobody can claim it again.`)) return;
+  async function deleteTask(id: string, title: string) {
+    if (!window.confirm(`Delete “${title}” permanently?\n\nThe task disappears from the list and nobody can claim it. Its claim history is removed too (rewards already paid out stay in the ledgers).`)) return;
     setMsg(null);
     try {
       await api(`/admin/tasks/${id}`, { method: 'DELETE' });
-      setMsg({ kind: 'success', text: `Task “${title}” closed` });
+      setMsg({ kind: 'success', text: `Task “${title}” deleted` });
       await Promise.all([loadTasks(), loadCore()]);
     } catch (e) {
       setMsg({ kind: 'error', text: (e as Error).message });
@@ -527,6 +530,7 @@ export default function AdminPage() {
           description: nt.description,
           link: nt.link,
           category: nt.category || 'ad_click',
+          planKey: nt.planKey || undefined, // omit -> visible to every plan
           rewardKobo: Math.round(parseFloat(nt.rewardNaira) * 100),
           budgetKobo: Math.round(parseFloat(nt.budgetNaira) * 100),
           quota: Number(nt.quota),
@@ -534,8 +538,8 @@ export default function AdminPage() {
           validationRules: rules,
         },
       });
-      setMsg({ kind: 'success', text: `Task “${nt.title}” published` });
-      setNt({ ...nt, title: '', description: '', link: '' });
+      setMsg({ kind: 'success', text: `Task “${nt.title}” published${nt.planKey ? ` to the ${nt.planKey} plan feed` : ''}` });
+      setNt({ ...nt, title: '', description: '', link: '', planKey: '' });
       await Promise.all([loadTasks(), loadCore()]);
     } catch (err) {
       setMsg({ kind: 'error', text: (err as Error).message });
@@ -966,6 +970,9 @@ export default function AdminPage() {
                         <div style={{ fontWeight: 700 }}>{t.title}</div>
                         <div className="adm-tags">
                           <span className="badge blue">{t.category.replace(/_/g, ' ')}</span>
+                          <span className={`badge ${t.plan_key ? 'amber' : 'green'}`}>
+                            {t.plan_key ? `${t.plan_key} plan only` : 'all plans'}
+                          </span>
                           {t.requires_admin && <span className="badge amber">manual</span>}
                         </div>
                         {t.link && (
@@ -993,13 +1000,9 @@ export default function AdminPage() {
                       <td className="num">{naira(t.reward_kobo)}</td>
                       <td className="muted small">{shortDate(t.created_at)}</td>
                       <td>
-                        {t.status === 'open' ? (
-                          <button className="btn danger sm" onClick={() => closeTask(t.id, t.title)}>
-                            Close
-                          </button>
-                        ) : (
-                          <span className="muted small">—</span>
-                        )}
+                        <button className="btn danger sm" onClick={() => deleteTask(t.id, t.title)}>
+                          <i className="fa-solid fa-trash" /> Delete
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1461,6 +1464,19 @@ export default function AdminPage() {
             <label className="field">
               <span>Description / extra instructions</span>
               <textarea rows={2} value={nt.description} onChange={(e) => setNt({ ...nt, description: e.target.value })} placeholder="Like the post, take a screenshot and paste your username as proof." />
+            </label>
+            <label className="field">
+              <span>Plan feed — which plan sees this task</span>
+              <select value={nt.planKey} onChange={(e) => setNt({ ...nt, planKey: e.target.value })}>
+                <option value="">All plans (Beginner, Intermediate &amp; Extreme)</option>
+                <option value="beginner">Beginner plan only</option>
+                <option value="intermediate">Intermediate plan only</option>
+                <option value="extreme">Extreme plan only</option>
+              </select>
+              <span className="muted small" style={{ fontWeight: 400, marginTop: 5 }}>
+                A task picked for one plan appears <b>only</b> in that plan&apos;s task feed — it can never leak into
+                another plan. Pick <b>All plans</b> for universal tasks.
+              </span>
             </label>
             <div className="row">
               <label className="field">

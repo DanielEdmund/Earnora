@@ -38,6 +38,7 @@ export default function AuthPanel({
   const [confirm, setConfirm] = useState('');
   const [phone, setPhone] = useState('');
   const [refCode, setRefCode] = useState(initialReferralCode);
+  const [agreed, setAgreed] = useState(false); // Terms & Policy consent
   const [showPw, setShowPw] = useState(false);
   const [localError, setLocalError] = useState('');
 
@@ -102,9 +103,10 @@ export default function AuthPanel({
     setLocalError('');
     if (kind === 'register') {
       if (password.length < 8) return fail('Password must be at least 8 characters');
+      if (!agreed) return fail('You must agree to the Terms & Policy to create an account');
       // no confirm field on sign-up (the API takes one password) — the reset
       // view below keeps its own "Confirm new password" check
-      onSubmit('register', { email, password, phone, referralCode: refCode });
+      onSubmit('register', { email, password, phone, referralCode: refCode, termsConsent: agreed ? 'true' : 'false' });
       return;
     }
     if (kind === 'login') {
@@ -496,6 +498,23 @@ export default function AuthPanel({
               </span>
             </label>
           </div>
+
+          {/* Terms & Policy consent — explicit opt-in; no tick = no account */}
+          <label className="pfield p-consent" style={at(4)}>
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              aria-label="I agree to the Terms & Policy"
+            />
+            <span className="p-consent-tx">
+              I have read the{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer">
+                Terms &amp; Policy
+              </a>{' '}
+              and <b>agree</b> to them. (If you do <b>not</b> agree, you cannot create an account.)
+            </span>
+          </label>
 
           <div className="pfield" style={at(4)}>
             <button className="p-btn" type="submit" disabled={busy}>

@@ -148,6 +148,7 @@ export default function CinematicAuth({ initialMode = 'register', initialReferra
             password: payload.password,
             phone: payload.phone || undefined,
             referralCode: payload.referralCode || undefined,
+            termsConsent: payload.termsConsent === 'true', // must be true — enforced client & server side
           },
           auth: false,
         });

@@ -222,7 +222,7 @@ export class AdminController {
   @Get('admin/tasks')
   async tasks() {
     const r = await this.db.query(`
-      SELECT t.id, t.title, t.link, t.category, t.status, t.quota, t.claimed_count, t.approved_count,
+      SELECT t.id, t.title, t.link, t.category, t.plan_key, t.status, t.quota, t.claimed_count, t.approved_count,
              t.requires_admin, t.created_at,
              t.spent_kobo::float8  AS spent_kobo,
              t.budget_kobo::float8 AS budget_kobo,

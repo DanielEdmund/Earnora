@@ -29,6 +29,8 @@ export interface RegisterInput {
   phone?: string;
   password: string;
   referralCode?: string;
+  /** Must be true — the Terms & Policy consent checkbox at registration. */
+  termsConsent?: boolean;
   fingerprint?: string;
   ip: string;
   userAgent?: string;
@@ -60,6 +62,11 @@ export class AuthService {
     if (!input.password || input.password.length < 8) {
       throw new BadRequestException('Password must be at least 8 characters');
     }
+    // Terms & Policy consent is mandatory — "I do not agree" simply means no
+    // account can be created (the checkbox is on the register form).
+    if (input.termsConsent !== true) {
+      throw new BadRequestException('You must agree to the Terms & Policy to create an account');
+    }
 
     // resolve referral code before the transaction (read-only)
     let referredBy: string | null = null;
@@ -77,8 +84,8 @@ export class AuthService {
     try {
       const userId = await this.db.transaction(async (q) => {
         const inserted = await q<{ id: string }>(
-          `INSERT INTO users (email, phone, password_hash, referred_by, referral_code)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO users (email, phone, password_hash, referred_by, referral_code, terms_consent_at)
+           VALUES ($1, $2, $3, $4, $5, now())
            RETURNING id`,
           [email, input.phone ?? null, passwordHash, referredBy, this.generateReferralCode()],
         );

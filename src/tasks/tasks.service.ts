@@ -45,8 +45,12 @@ export class TasksService {
       params.push(category);
       categoryFilter = `AND t.category = $${params.length}`;
     }
+    // plan scoping: a task is either universal (plan_key IS NULL) or belongs
+    // to exactly one plan's feed — never visible from another plan.
+    params.push(plan.key);
+    const planFilter = `(t.plan_key IS NULL OR t.plan_key = $${params.length})`;
     const r = await this.db.query(
-      `SELECT t.id, t.title, t.description, t.link, t.category,
+      `SELECT t.id, t.title, t.description, t.link, t.category, t.plan_key,
               $2::bigint AS reward_kobo,           -- payout is the CLAIMER'S PLAN rate
               t.quota,
               (t.quota - t.claimed_count) AS slots_left, t.requires_admin, t.validation_rules, t.created_at
@@ -56,6 +60,7 @@ export class TasksService {
         WHERE t.status = 'open' AND c.id IS NULL
           AND (t.closes_at IS NULL OR t.closes_at > now())
           AND t.claimed_count < t.quota
+          AND ${planFilter}
           ${categoryFilter}
         ORDER BY t.created_at DESC
         LIMIT 100`,
@@ -91,8 +96,8 @@ export class TasksService {
 
     try {
       return await this.db.transaction(async (q) => {
-        const task = await q<{ reward_kobo: string | number; claim_ttl_min: number }>(
-          `SELECT reward_kobo, 30 AS claim_ttl_min FROM tasks
+        const task = await q<{ reward_kobo: string | number; claim_ttl_min: number; plan_key: string | null }>(
+          `SELECT reward_kobo, plan_key, 30 AS claim_ttl_min FROM tasks
             WHERE id = $1 AND status = 'open'
               AND (closes_at IS NULL OR closes_at > now())
             FOR UPDATE`,
@@ -104,6 +109,12 @@ export class TasksService {
         const owner = await q<{ plan: string | null }>(`SELECT plan FROM users WHERE id = $1`, [userId]);
         const plan = planDef(owner.rows[0]?.plan);
         if (!plan) throw new ForbiddenException('Purchase a plan to access tasks');
+
+        // plan scoping: a task published for another plan must not be claimable
+        // here — answer 404 (not 403) so other plans' tasks never leak.
+        if (task.rows[0].plan_key && task.rows[0].plan_key !== plan.key) {
+          throw new NotFoundException('Task not available');
+        }
 
         const usedToday = await q<{ n: number }>(
           `SELECT count(*)::int AS n FROM task_claims

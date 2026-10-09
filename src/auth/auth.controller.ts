@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
-import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import { Public } from './decorators';
 import { AuthService } from './auth.service';
 
@@ -8,6 +8,8 @@ class RegisterDto {
   @IsString() @MinLength(8) password!: string;
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsString() referralCode?: string;
+  /** Terms & Policy consent — must be explicitly true (checked in the service). */
+  @IsOptional() @IsBoolean() termsConsent?: boolean;
 }
 
 class LoginDto {
@@ -45,6 +47,7 @@ export class AuthController {
       password: dto.password,
       phone: dto.phone,
       referralCode: dto.referralCode,
+      termsConsent: dto.termsConsent,
       fingerprint: req.headers['x-device-fingerprint'],
       ip: clientIp(req),
       userAgent: req.headers['user-agent'],
