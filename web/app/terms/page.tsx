@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import AdSenseSnippet from '@/components/AdSenseSnippet';
 
 export const metadata: Metadata = {
   title: 'Terms & Policy — Earnora',
@@ -38,6 +39,8 @@ const section = (id: string, title: string, body: React.ReactNode) => (
 export default function TermsPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--c-bg)' }}>
+      {/* content page → AdSense snippet (never rendered on auth/app screens) */}
+      <AdSenseSnippet />
       {/* top bar */}
       <header
         style={{

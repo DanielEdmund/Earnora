@@ -2,10 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 import './cinematic.css';
 import TransitionFlash from '@/components/TransitionFlash';
+import AdSenseGuard from '@/components/AdSenseGuard';
+import { siteUrl } from '@/lib/site';
 
 export const metadata: Metadata = {
-  title: 'Earnora — Earn from tasks, referrals and ads',
-  description: 'Earn every day from micro-tasks, multi-tier referrals and ads. Free sign up — a small one-time activation fee unlocks tasks and withdrawals.',
+  metadataBase: new URL(siteUrl),
+  title: 'Earnora — Earn from tasks, referrals and campaigns',
+  description:
+    'Earn every day from micro-tasks, flat referral bonuses and paid campaigns. Free sign up — a small one-time activation fee unlocks tasks and withdrawals.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,15 +29,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
         />
-        {/* Google AdSense site verification — must be present on every page */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4649059465113958"
-          crossOrigin="anonymous"
-        ></script>
+        {/* Google AdSense is intentionally NOT loaded here: the snippet is
+            server-rendered by <AdSenseSnippet /> on content pages only, and
+            <AdSenseGuard /> keeps Auto Ads off every other screen. Loading it
+            globally put ads on the login/app screens and triggered
+            "Google-served ads on screens without publisher-content". */}
       </head>
       <body suppressHydrationWarning>
         {children}
+        <AdSenseGuard />
         <TransitionFlash />
       </body>
     </html>

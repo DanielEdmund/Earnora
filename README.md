@@ -59,12 +59,34 @@ behaviour as `npm run dev`.)
 
 | Route | What it does |
 |---|---|
-| `/login` | Login / register (prefills referral code from `?ref=` links) |
+| `/` | Public marketing page (hero, how-it-works, features, stats, FAQ) — the page Google and AdSense reviewers land on; legacy `/?ref=` / `/?mode=` links forward to `/login` |
+| `/login` | Login / register (prefills referral code from `?ref=` links) — the cinematic intro screen |
 | `/dashboard` | Balance hero + plan status, quick actions, stats, **plan pricing cards** (Buy → deposit popup with Opay account) |
 | `/tasks` | Task feed — **mines the proof-of-work challenge in the browser** (WebCrypto), daily-quota meter, claim → dynamic proof form driven by each task's `validation_rules`; locked until a plan is bought |
 | `/wallet` | Balance cards, live withdrawal-window indicator, withdraw form (min ₦15,000), full ledger statement; plan banner when locked |
 | `/referrals` | Copyable referral link, per-plan bonus rates, network table with each referral's plan |
 | `/admin` | Review queue (approve/reject with reason), payout queue, fraud flags, **support inbox** (answer the chatbot's escalations — replies drop back into the user's chat), publish-task form — visible only to `role=admin` |
+| `/home` | 308 permanent redirect → `/` (the marketing page moved to `/` so the site has one homepage, not two copies of the same content) |
+| `/plans` | Public plan comparison — prices, daily quotas, per-task and per-referral rates, how manual bank-transfer approval works |
+| `/payouts` | Public withdrawal rules — ₦15,000 minimum, the 17:00–19:00 WAT window, retries, auto-reversal, statement |
+| `/referral-program` | Public referral explainer — flat rate table, worked example, anti-farming rules |
+| `/help` | Public help centre — getting started, why a task did not pay, account & security, support |
+| `/terms` | Public terms & policy (server-rendered content, linked from the register consent checkbox) |
+
+- **AdSense placement** — the `adsbygoogle` snippet is server-rendered **only on the
+  public content pages** (`/`, `/plans`, `/payouts`, `/referral-program`, `/help`,
+  `/terms`) via `web/components/content/ContentShell.tsx` and
+  `web/app/page.tsx`, and `web/components/AdSenseGuard.tsx` strips any ad node
+  from every other screen (login, dashboard, tasks, wallet, referrals, admin, 404)
+  during client-side navigation. This is what keeps the site inside Google's
+  *"Google-served ads on screens without publisher-content"* rule. Adding another
+  content page? Render it with `<ContentShell>` (or `<AdSenseSnippet />`) and add
+  its path to `AD_PATHS` in `AdSenseGuard.tsx` **and** to `app/sitemap.ts`.
+- **Crawl surface** — `app/robots.ts` + `app/sitemap.ts` are metadata routes:
+  the login-gated app screens are disallowed, only the six public pages are
+  listed. Set `NEXT_PUBLIC_SITE_URL` (e.g. `https://your-domain.com`) in Vercel so
+  the generated sitemap/robots URLs use your real domain instead of the deployment
+  URL.
 
 - Talks to the API **same-origin**: the browser only ever calls `/api/*` on the
   page's own host (PC, phone or production domain) and the Next server proxies
